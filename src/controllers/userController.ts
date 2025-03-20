@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getDatabase } from '../db/database.js';
 import { UserAchievement } from '../models/User.js';
 import { JWT_SECRET } from '../middleware/auth.js';
 import { AuthRequest } from '../middleware/auth.js';
+import * as supabaseDB from '../db/supabase.js';
 
 // Función para detectar intentos de SQLi
 function detectSQLi(input: string): boolean {
@@ -52,63 +52,13 @@ function sanitizeInput(input: string): string {
   return input.replace(/[;'"\\\/<>]/g, '');
 }
 
-// Función para asignar logros a un usuario
-async function assignAchievement(db: any, userId: number, achievementId: string, progress: number = 1, completed: boolean = false): Promise<void> {
-  try {
-    // Verificar si el usuario ya tiene este logro
-    const existingAchievement = await db.get(
-      'SELECT * FROM user_achievements WHERE user_id = ? AND achievement_id = ?',
-      [userId, achievementId]
-    );
-
-    if (existingAchievement) {
-      // Si ya existe, actualizar progreso si no está completado
-      if (!existingAchievement.completed) {
-        const newProgress = Math.max(existingAchievement.progress + progress, existingAchievement.progress);
-        const newCompleted = completed || (achievementId === 'detection_master' && newProgress >= 10) ||
-                             (achievementId === 'daily_login' && newProgress >= 5);
-        
-        await db.run(
-          'UPDATE user_achievements SET progress = ?, completed = ?, unlocked_at = CASE WHEN ? = 1 AND completed = 0 THEN CURRENT_TIMESTAMP ELSE unlocked_at END WHERE user_id = ? AND achievement_id = ?',
-          [newProgress, newCompleted ? 1 : 0, newCompleted ? 1 : 0, userId, achievementId]
-        );
-      }
-    } else {
-      // Si no existe, crear nuevo
-      await db.run(
-        'INSERT INTO user_achievements (user_id, achievement_id, progress, completed) VALUES (?, ?, ?, ?)',
-        [userId, achievementId, progress, completed ? 1 : 0]
-      );
-    }
-  } catch (error) {
-    console.error('Error al asignar logro:', error);
-  }
-}
-
-// Función para obtener todos los logros de un usuario
-async function getUserAchievements(db: any, userId: number): Promise<UserAchievement[]> {
-  try {
-    const achievements = await db.all(`
-      SELECT ua.achievement_id, ua.user_id, ua.unlocked_at, ua.progress, ua.completed,
-             a.name, a.description, a.icon
-      FROM user_achievements ua
-      JOIN achievements a ON ua.achievement_id = a.id
-      WHERE ua.user_id = ?
-      ORDER BY ua.completed DESC, ua.progress DESC
-    `, [userId]);
-    
-    return achievements;
-  } catch (error) {
-    console.error('Error al obtener logros del usuario:', error);
-    return [];
-  }
-}
-
 // Función para actualizar el streak de inicio de sesión
-async function updateLoginStreak(db: any, userId: number): Promise<void> {
+async function updateLoginStreak(userId: number): Promise<void> {
   try {
     // Obtener último login y streak actual
-    const user = await db.get('SELECT last_login, login_streak FROM users WHERE id = ?', [userId]);
+    const user = await supabaseDB.getUserById(userId);
+    
+    if (!user) return;
     
     let newStreak = 1; // Valor predeterminado si es el primer login o se perdió el streak
     
@@ -132,17 +82,14 @@ async function updateLoginStreak(db: any, userId: number): Promise<void> {
     }
     
     // Actualizar streak y último login
-    await db.run(
-      'UPDATE users SET login_streak = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?',
-      [newStreak, userId]
-    );
+    await supabaseDB.updateUserLoginStreak(userId, newStreak);
     
     // Si llegó a 5 días, otorgar logro de login diario
     if (newStreak >= 5) {
-      await assignAchievement(db, userId, 'daily_login', 5, true);
+      await supabaseDB.assignAchievement(userId, 'daily_login', 5, true);
     } else if (newStreak > 0) {
       // Actualizar progreso pero no completar todavía
-      await assignAchievement(db, userId, 'daily_login', newStreak, false);
+      await supabaseDB.assignAchievement(userId, 'daily_login', newStreak, false);
     }
     
   } catch (error) {
@@ -172,10 +119,8 @@ export async function register(req: Request, res: Response): Promise<void> {
     const sanitizedUsername = sanitizeInput(username);
     const sanitizedEmail = sanitizeInput(email);
 
-    const db = await getDatabase();
-
-    // Verificar si el usuario ya existe usando parámetros preparados
-    const existingUser = await db.get('SELECT * FROM users WHERE username = ? OR email = ?', [sanitizedUsername, sanitizedEmail]);
+    // Verificar si el usuario ya existe 
+    const existingUser = await supabaseDB.getUserByUsername(sanitizedUsername);
     if (existingUser) {
       res.status(409).json({ error: 'El nombre de usuario o email ya está en uso' });
       return;
@@ -184,23 +129,20 @@ export async function register(req: Request, res: Response): Promise<void> {
     // Encriptar la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Insertar el nuevo usuario con parámetros preparados
-    const result = await db.run(
-      'INSERT INTO users (username, email, password, last_login) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
-      [sanitizedUsername, sanitizedEmail, hashedPassword]
-    );
+    // Insertar el nuevo usuario
+    const result = await supabaseDB.createUser(sanitizedUsername, sanitizedEmail, hashedPassword);
 
     // Asignar logro de primera conexión al nuevo usuario
-    const userId = result.lastID;
+    const userId = result.id;
     if (userId) {
-      await assignAchievement(db, userId, 'first_login', 1, true);
+      await supabaseDB.assignAchievement(userId, 'first_login', 1, true);
     }
 
     // Generar token JWT
     const token = jwt.sign({ id: userId, username: sanitizedUsername }, JWT_SECRET, { expiresIn: '24h' });
 
     // Obtener logros del usuario
-    const achievements = userId ? await getUserAchievements(db, userId) : [];
+    const achievements = userId ? await supabaseDB.getUserAchievements(userId) : [];
 
     res.status(201).json({
       message: 'Usuario registrado con éxito',
@@ -239,10 +181,8 @@ export async function login(req: Request, res: Response): Promise<void> {
     // Sanitizar entradas
     const sanitizedUsername = sanitizeInput(username);
 
-    const db = await getDatabase();
-
-    // Buscar el usuario con parámetros preparados
-    const user = await db.get('SELECT * FROM users WHERE username = ?', [sanitizedUsername]);
+    // Buscar el usuario
+    const user = await supabaseDB.getUserByUsername(sanitizedUsername);
     if (!user) {
       res.status(401).json({ error: 'Credenciales inválidas' });
       return;
@@ -256,16 +196,16 @@ export async function login(req: Request, res: Response): Promise<void> {
     }
 
     // Actualizar streak de login y último login
-    await updateLoginStreak(db, user.id);
+    await updateLoginStreak(user.id);
 
     // Generar token JWT
     const token = jwt.sign({ id: user.id, username: user.username }, JWT_SECRET, { expiresIn: '24h' });
 
     // Obtener usuario actualizado con streak actualizado
-    const updatedUser = await db.get('SELECT id, username, email, login_streak, last_login FROM users WHERE id = ?', [user.id]);
+    const updatedUser = await supabaseDB.getUserById(user.id);
     
     // Obtener logros del usuario
-    const achievements = await getUserAchievements(db, user.id);
+    const achievements = await supabaseDB.getUserAchievements(user.id);
 
     res.status(200).json({
       message: 'Inicio de sesión exitoso',
@@ -297,9 +237,9 @@ export async function getCurrentUser(req: Request, res: Response): Promise<void>
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as { id: number; username: string };
-    const db = await getDatabase();
     
-    const user = await db.get('SELECT id, username, email, created_at, last_login, login_streak FROM users WHERE id = ?', [decoded.id]);
+    // Obtener usuario
+    const user = await supabaseDB.getUserById(decoded.id);
     
     if (!user) {
       res.status(404).json({ error: 'Usuario no encontrado' });
@@ -307,7 +247,7 @@ export async function getCurrentUser(req: Request, res: Response): Promise<void>
     }
 
     // Obtener logros del usuario
-    const achievements = await getUserAchievements(db, user.id);
+    const achievements = await supabaseDB.getUserAchievements(user.id);
 
     // Incluir logros en la respuesta
     const userWithAchievements = {
@@ -331,21 +271,18 @@ export async function recordHighConfidenceDetection(req: AuthRequest, res: Respo
     }
     
     const userId = req.user.id;
-    const db = await getDatabase();
     
     // Actualizar el logro de detección
-    await assignAchievement(db, userId, 'detection_master', 1);
+    await supabaseDB.assignAchievement(userId, 'detection_master', 1);
     
     // Obtener el progreso actualizado
-    const achievementProgress = await db.get(
-      'SELECT progress, completed FROM user_achievements WHERE user_id = ? AND achievement_id = ?',
-      [userId, 'detection_master']
-    );
+    const achievements = await supabaseDB.getUserAchievements(userId);
+    const detectionAchievement = achievements.find(a => a.achievement_id === 'detection_master');
     
     res.status(200).json({ 
       success: true,
-      progress: achievementProgress?.progress || 0,
-      completed: achievementProgress?.completed === 1
+      progress: detectionAchievement?.progress || 0,
+      completed: detectionAchievement?.completed === true
     });
   } catch (error) {
     console.error('Error al registrar detección:', error);
@@ -356,8 +293,7 @@ export async function recordHighConfidenceDetection(req: AuthRequest, res: Respo
 // Obtener todos los logros disponibles
 export async function getAllAchievements(_req: Request, res: Response): Promise<void> {
   try {
-    const db = await getDatabase();
-    const achievements = await db.all('SELECT * FROM achievements');
+    const achievements = await supabaseDB.executeSQL('SELECT * FROM achievements');
     
     res.status(200).json(achievements);
   } catch (error) {
@@ -376,8 +312,7 @@ export async function getUserAchievementsById(req: Request, res: Response): Prom
       return;
     }
     
-    const db = await getDatabase();
-    const achievements = await getUserAchievements(db, userId);
+    const achievements = await supabaseDB.getUserAchievements(userId);
     
     res.status(200).json(achievements);
   } catch (error) {

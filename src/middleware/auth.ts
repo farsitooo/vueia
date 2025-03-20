@@ -1,30 +1,41 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-// Clave secreta para firmar tokens JWT
+// Clave secreta para JWT
 export const JWT_SECRET = process.env.JWT_SECRET || 'tu_clave_secreta_aqui';
 
-// Interfaz para extender Request con datos del usuario
+// Extender la interfaz Request para incluir usuario autenticado
 export interface AuthRequest extends Request {
-  user?: { id: number; username: string };
+  user?: {
+    id: number;
+    username: string;
+  };
 }
 
-export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction): void {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token) {
-    res.status(401).json({ error: 'Se requiere autenticación' });
-    return;
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      res.status(403).json({ error: 'Token inválido o expirado' });
+// Middleware para verificar token JWT
+export function authenticate(req: AuthRequest, res: Response, next: NextFunction): void {
+  try {
+    // Obtener el token desde el header Authorization
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    
+    if (!token) {
+      res.status(401).json({ error: 'Acceso no autorizado: Token requerido' });
       return;
     }
     
-    req.user = user as { id: number; username: string };
+    // Verificar el token
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: number; username: string };
+    
+    // Agregar el usuario al objeto request
+    req.user = {
+      id: decoded.id,
+      username: decoded.username
+    };
+    
     next();
-  });
+  } catch (error) {
+    console.error('Error en autenticación:', error);
+    res.status(401).json({ error: 'Acceso no autorizado: Token inválido' });
+  }
 } 

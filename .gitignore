@@ -7,6 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Node
 node_modules
 dist
 dist-ssr
@@ -22,3 +23,28 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# TypeScript
+*.tsbuildinfo
+
+# Vercel
+.vercel
+
+# Testing
+coverage
+
+# Local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# SQLite
+*.sqlite
+*.sqlite-journal
+
+# OS
+Thumbs.db
+
+.vercel
