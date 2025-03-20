@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema IA</title>
+  <link rel="stylesheet" href="/styles.css">
+  <!-- Font Awesome para iconos minimalistas -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Sistema de Análisis Visual</h1>
+    </header>
+
+    <div class="auth-container" id="auth-container">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="login">
+          <i class="fas fa-sign-in-alt"></i> Acceso
+        </button>
+        <button class="tab-btn" data-tab="register">
+          <i class="fas fa-user-plus"></i> Registro
+        </button>
+      </div>
+
+      <div class="form-container active" id="login-form">
+        <form id="login">
+          <div class="form-group">
+            <label for="login-username">Usuario</label>
+            <input type="text" id="login-username" name="username" placeholder="Ingrese su usuario" required>
+          </div>
+          <div class="form-group">
+            <label for="login-password">Contraseña</label>
+            <input type="password" id="login-password" name="password" placeholder="Ingrese su contraseña" required>
+          </div>
+          <button type="submit" class="btn"><i class="fas fa-sign-in-alt"></i> Ingresar</button>
+        </form>
+        <div class="message" id="login-message"></div>
+      </div>
+
+      <div class="form-container" id="register-form">
+        <form id="register">
+          <div class="form-group">
+            <label for="register-username">Usuario</label>
+            <input type="text" id="register-username" name="username" placeholder="Elija un nombre de usuario" required>
+          </div>
+          <div class="form-group">
+            <label for="register-email">Email</label>
+            <input type="email" id="register-email" name="email" placeholder="Ingrese su correo electrónico" required>
+          </div>
+          <div class="form-group">
+            <label for="register-password">Contraseña</label>
+            <input type="password" id="register-password" name="password" placeholder="Cree una contraseña" required>
+          </div>
+          <button type="submit" class="btn"><i class="fas fa-user-plus"></i> Registrarse</button>
+        </form>
+        <div class="message" id="register-message"></div>
+      </div>
+    </div>
+
+    <div class="ai-container hidden" id="ai-container">
+      <div class="user-info">
+        <span id="username-display"></span>
+        <button id="logout-btn" class="btn"><i class="fas fa-sign-out-alt"></i> Salir</button>
+      </div>
+
+      <div class="webcam-container">
+        <div id="webcam-wrapper">
+          <video id="webcam" autoplay></video>
+        </div>
+        <canvas id="canvas"></canvas>
+        <div class="prediction-container">
+          <h3><i class="fas fa-robot"></i> Resultado</h3>
+          <div id="prediction-result">Esperando análisis...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts de Teachable Machine -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+  
+  <!-- Script principal -->
+  <script src="/app.js"></script>
+</body>
+</html> 

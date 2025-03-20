@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IA con Teachable Machine - Demo</title>
+  <style>
+    /* Estilos generales */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f5f5f5;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    header h1 {
+      color: #3498db;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      color: #2980b9;
+      margin-bottom: 20px;
+    }
+
+    h3 {
+      color: #2980b9;
+      margin-bottom: 10px;
+    }
+
+    .btn {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+
+    .btn:hover {
+      background-color: #2980b9;
+    }
+
+    /* Estilos para formularios de autenticación */
+    .auth-container {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .tabs {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      flex: 1;
+      transition: all 0.3s;
+    }
+
+    .tab-btn.active {
+      color: #3498db;
+      border-bottom: 2px solid #3498db;
+    }
+
+    .form-container {
+      display: none;
+    }
+
+    .form-container.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+
+    .message {
+      margin-top: 15px;
+      padding: 10px;
+      border-radius: 4px;
+    }
+
+    .message.error {
+      background-color: #ffebee;
+      color: #c62828;
+      border: 1px solid #ef9a9a;
+    }
+
+    .message.success {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+      border: 1px solid #a5d6a7;
+    }
+
+    /* Estilos para el contenedor de IA */
+    .ai-container {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      margin-top: 30px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .user-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    #username-display {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .webcam-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #webcam-wrapper {
+      width: 100%;
+      max-width: 640px;
+      margin-bottom: 20px;
+      border: 2px solid #3498db;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    #webcam {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    #canvas {
+      display: none;
+    }
+
+    .prediction-container {
+      width: 100%;
+      max-width: 640px;
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f8f9fa;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+
+    #prediction-result {
+      font-size: 18px;
+      font-weight: 500;
+      padding: 10px;
+      min-height: 50px;
+      background-color: #e8f5e9;
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .note {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #fff3cd;
+      border: 1px solid #ffeeba;
+      border-radius: 4px;
+      color: #856404;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Sistema IA con Teachable Machine</h1>
+      <p>Versión de Demostración</p>
+    </header>
+
+    <div class="note">
+      <strong>Nota:</strong> Esta es una versión de demostración que simula el funcionamiento del sistema. En esta versión, puedes probar el login y registro (con datos simulados localmente) y ver la integración con Teachable Machine.
+    </div>
+
+    <div class="auth-container" id="auth-container">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="login">Iniciar Sesión</button>
+        <button class="tab-btn" data-tab="register">Registrarse</button>
+      </div>
+
+      <div class="form-container active" id="login-form">
+        <h2>Iniciar Sesión</h2>
+        <form id="login">
+          <div class="form-group">
+            <label for="login-username">Usuario</label>
+            <input type="text" id="login-username" name="username" required>
+          </div>
+          <div class="form-group">
+            <label for="login-password">Contraseña</label>
+            <input type="password" id="login-password" name="password" required>
+          </div>
+          <button type="submit" class="btn">Iniciar Sesión</button>
+        </form>
+        <div class="message" id="login-message"></div>
+      </div>
+
+      <div class="form-container" id="register-form">
+        <h2>Registrarse</h2>
+        <form id="register">
+          <div class="form-group">
+            <label for="register-username">Usuario</label>
+            <input type="text" id="register-username" name="username" required>
+          </div>
+          <div class="form-group">
+            <label for="register-email">Email</label>
+            <input type="email" id="register-email" name="email" required>
+          </div>
+          <div class="form-group">
+            <label for="register-password">Contraseña</label>
+            <input type="password" id="register-password" name="password" required>
+          </div>
+          <button type="submit" class="btn">Registrarse</button>
+        </form>
+        <div class="message" id="register-message"></div>
+      </div>
+    </div>
+
+    <div class="ai-container hidden" id="ai-container">
+      <h2>Detección con IA (Teachable Machine)</h2>
+      
+      <div class="user-info">
+        <span id="username-display"></span>
+        <button id="logout-btn" class="btn">Cerrar Sesión</button>
+      </div>
+
+      <div class="webcam-container">
+        <div id="webcam-wrapper">
+          <video id="webcam" autoplay></video>
+        </div>
+        <canvas id="canvas"></canvas>
+        <div class="prediction-container">
+          <h3>Predicción:</h3>
+          <div id="prediction-result">No hay predicción disponible</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts de Teachable Machine -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+  
+  <!-- Script principal -->
+  <script>
+    // Variables globales
+    let isLoggedIn = false;
+    let currentUser = null;
+    let model = null;
+    let webcam = null;
+    let canvas = null;
+
+    // Base de datos simulada para la demostración
+    const demoDatabase = {
+      users: [
+        {
+          id: 1,
+          username: 'usuario',
+          email: 'usuario@ejemplo.com',
+          password: 'password123',
+          created_at: new Date()
+        }
+      ]
+    };
+
+    // URL del modelo de Teachable Machine
+    const modelURL = 'https://teachablemachine.withgoogle.com/models/2Y6Ij0JN6/';
+
+    // Elementos del DOM
+    const loginForm = document.getElementById('login');
+    const registerForm = document.getElementById('register');
+    const loginMessage = document.getElementById('login-message');
+    const registerMessage = document.getElementById('register-message');
+    const authContainer = document.getElementById('auth-container');
+    const aiContainer = document.getElementById('ai-container');
+    const usernameDisplay = document.getElementById('username-display');
+    const logoutBtn = document.getElementById('logout-btn');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const formContainers = document.querySelectorAll('.form-container');
+    const predictionResult = document.getElementById('prediction-result');
+
+    // Función para mostrar mensajes
+    function showMessage(element, message, isError = false) {
+      element.textContent = message;
+      element.className = 'message';
+      element.classList.add(isError ? 'error' : 'success');
+      setTimeout(() => {
+        element.textContent = '';
+        element.className = 'message';
+      }, 5000);
+    }
+
+    // Función para verificar si el usuario está autenticado
+    function checkAuth() {
+      const savedUser = localStorage.getItem('demo_user');
+      if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        isLoggedIn = true;
+        showAIInterface();
+      } else {
+        showAuthInterface();
+      }
+    }
+
+    // Función para mostrar la interfaz de autenticación
+    function showAuthInterface() {
+      authContainer.classList.remove('hidden');
+      aiContainer.classList.add('hidden');
+    }
+
+    // Función para mostrar la interfaz de IA
+    function showAIInterface() {
+      authContainer.classList.add('hidden');
+      aiContainer.classList.remove('hidden');
+      usernameDisplay.textContent = `Bienvenido, ${currentUser.username}`;
+      
+      // Iniciar el modelo de IA
+      initTeachableMachine();
+    }
+
+    // Eventos para los formularios
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const username = document.getElementById('login-username').value;
+      const password = document.getElementById('login-password').value;
+      
+      // En la versión demo, simulamos la autenticación
+      const user = demoDatabase.users.find(u => u.username === username && u.password === password);
+      
+      if (user) {
+        // Simulamos guardar el usuario logueado
+        const userToSave = { ...user };
+        delete userToSave.password;
+        
+        localStorage.setItem('demo_user', JSON.stringify(userToSave));
+        currentUser = userToSave;
+        isLoggedIn = true;
+        showMessage(loginMessage, 'Inicio de sesión exitoso');
+        setTimeout(() => {
+          showAIInterface();
+        }, 1000);
+      } else {
+        showMessage(loginMessage, 'Credenciales inválidas', true);
+      }
+    });
+
+    registerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const username = document.getElementById('register-username').value;
+      const email = document.getElementById('register-email').value;
+      const password = document.getElementById('register-password').value;
+      
+      // En la versión demo, simulamos el registro
+      const existingUser = demoDatabase.users.find(u => u.username === username || u.email === email);
+      
+      if (existingUser) {
+        showMessage(registerMessage, 'El nombre de usuario o email ya está en uso', true);
+      } else {
+        const newUser = {
+          id: demoDatabase.users.length + 1,
+          username,
+          email,
+          password,
+          created_at: new Date()
+        };
+        
+        demoDatabase.users.push(newUser);
+        
+        // Guardar usuario registrado (sin la contraseña)
+        const userToSave = { ...newUser };
+        delete userToSave.password;
+        
+        localStorage.setItem('demo_user', JSON.stringify(userToSave));
+        currentUser = userToSave;
+        isLoggedIn = true;
+        showMessage(registerMessage, 'Usuario registrado exitosamente');
+        setTimeout(() => {
+          showAIInterface();
+        }, 1000);
+      }
+    });
+
+    // Evento para cerrar sesión
+    logoutBtn.addEventListener('click', () => {
+      localStorage.removeItem('demo_user');
+      isLoggedIn = false;
+      currentUser = null;
+      
+      if (webcam) {
+        webcam.stop();
+      }
+      
+      showAuthInterface();
+    });
+
+    // Eventos para las pestañas
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.getAttribute('data-tab');
+        
+        tabBtns.forEach(b => b.classList.remove('active'));
+        formContainers.forEach(f => f.classList.remove('active'));
+        
+        btn.classList.add('active');
+        document.getElementById(`${tab}-form`).classList.add('active');
+      });
+    });
+
+    // Funciones para Teachable Machine
+    async function initTeachableMachine() {
+      const modelURL = 'https://teachablemachine.withgoogle.com/models/2Y6Ij0JN6/';
+      const modelJsonURL = modelURL + 'model.json';
+      const metadataURL = modelURL + 'metadata.json';
+      
+      try {
+        model = await tmImage.load(modelJsonURL, metadataURL);
+        console.log('Modelo cargado');
+        
+        webcam = new tmImage.Webcam(640, 480, true);
+        await webcam.setup();
+        await webcam.play();
+        document.getElementById('webcam').srcObject = webcam.canvas.captureStream();
+        
+        // Iniciar la predicción
+        window.requestAnimationFrame(loop);
+      } catch (error) {
+        console.error('Error al cargar el modelo:', error);
+        predictionResult.textContent = 'Error al cargar el modelo de IA';
+      }
+    }
+
+    async function loop() {
+      if (!isLoggedIn) return;
+      
+      webcam.update();
+      await predict();
+      window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+      if (!model || !webcam) return;
+      
+      const prediction = await model.predict(webcam.canvas);
+      let maxProbability = 0;
+      let bestClass = '';
+      
+      prediction.forEach(p => {
+        if (p.probability > maxProbability) {
+          maxProbability = p.probability;
+          bestClass = p.className;
+        }
+      });
+      
+      if (maxProbability > 0.8) {
+        predictionResult.textContent = `${bestClass} (${(maxProbability * 100).toFixed(2)}%)`;
+      } else {
+        predictionResult.textContent = 'No se detecta con suficiente confianza';
+      }
+    }
+
+    // Inicializar la aplicación
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAuth();
+    });
+  </script>
+</body>
+</html>
